@@ -2,10 +2,10 @@
 
 const rollup = require('rollup');
 const babel = require('rollup-plugin-babel');
-const closure = require('./plugins/closure-plugin');
+// const closure = require('./plugins/closure-plugin');
 const commonjs = require('rollup-plugin-commonjs');
 const flowRemoveTypes = require('flow-remove-types');
-const prettier = require('rollup-plugin-prettier');
+// const prettier = require('rollup-plugin-prettier');
 const replace = require('rollup-plugin-replace');
 const stripBanner = require('rollup-plugin-strip-banner');
 const chalk = require('chalk');
@@ -16,13 +16,13 @@ const Modules = require('./modules');
 const Bundles = require('./bundles');
 const Stats = require('./stats');
 const Sync = require('./sync');
-const sizes = require('./plugins/sizes-plugin');
+// const sizes = require('./plugins/sizes-plugin');
 const useForks = require('./plugins/use-forks-plugin');
-const stripUnusedImports = require('./plugins/strip-unused-imports');
+// const stripUnusedImports = require('./plugins/strip-unused-imports');
 const Packaging = require('./packaging');
 const {asyncRimRaf} = require('./utils');
 const codeFrame = require('@babel/code-frame');
-const Wrappers = require('./wrappers');
+// const Wrappers = require('./wrappers');
 
 const RELEASE_CHANNEL = process.env.RELEASE_CHANNEL;
 
@@ -187,7 +187,7 @@ function getRollupOutputOptions(
     freeze: !isProduction,
     interop: false,
     name: globalName,
-    sourcemap: false,
+    sourcemap: true,
     esModule: false,
   };
 }
@@ -312,23 +312,26 @@ function getPlugins(
     bundleType === UMD_DEV ||
     bundleType === UMD_PROD ||
     bundleType === UMD_PROFILING;
-  const isFBWWWBundle =
-    bundleType === FB_WWW_DEV ||
-    bundleType === FB_WWW_PROD ||
-    bundleType === FB_WWW_PROFILING;
-  const isRNBundle =
-    bundleType === RN_OSS_DEV ||
-    bundleType === RN_OSS_PROD ||
-    bundleType === RN_OSS_PROFILING ||
-    bundleType === RN_FB_DEV ||
-    bundleType === RN_FB_PROD ||
-    bundleType === RN_FB_PROFILING;
-  const shouldStayReadable = isFBWWWBundle || isRNBundle || forcePrettyOutput;
+  // const isFBWWWBundle =
+  //   bundleType === FB_WWW_DEV ||
+  //   bundleType === FB_WWW_PROD ||
+  //   bundleType === FB_WWW_PROFILING;
+  // const isRNBundle =
+  //   bundleType === RN_OSS_DEV ||
+  //   bundleType === RN_OSS_PROD ||
+  //   bundleType === RN_OSS_PROFILING ||
+  //   bundleType === RN_FB_DEV ||
+  //   bundleType === RN_FB_PROD ||
+  //   bundleType === RN_FB_PROFILING;
+  // const shouldStayReadable = isFBWWWBundle || isRNBundle || forcePrettyOutput;
   return [
     {
       name: 'rollup-plugin-flow-remove-types',
       transform(code) {
-        const transformed = flowRemoveTypes(code);
+        const transformed = flowRemoveTypes(code,{
+          pretty: true,
+          sourceMap: true,
+        });
         return {
           code: transformed.toString(),
           map: transformed.generateMap(),
@@ -358,12 +361,13 @@ function getPlugins(
         bundle
       )
     ),
+    // 关闭，因为会导致 sourceMap 无法定位到源文件
     // Remove 'use strict' from individual source files.
-    {
-      transform(source) {
-        return source.replace(/['"]use strict["']/g, '');
-      },
-    },
+    // {
+    //   transform(source) {
+    //     return source.replace(/['"]use strict["']/g, '');
+    //   },
+    // },
     // Turn __DEV__ and process.env checks into constants.
     replace({
       __DEV__: isProduction ? 'false' : 'true',
@@ -377,67 +381,71 @@ function getPlugins(
     // Please don't enable this for anything else!
     isUMDBundle && entry === 'react-art' && commonjs(),
     // Apply dead code elimination and/or minification.
-    isProduction &&
-      closure({
-        compilation_level: 'SIMPLE',
-        language_in: 'ECMASCRIPT_2015',
-        language_out:
-          bundleType === BROWSER_SCRIPT ? 'ECMASCRIPT5' : 'ECMASCRIPT5_STRICT',
-        env: 'CUSTOM',
-        warning_level: 'QUIET',
-        apply_input_source_maps: false,
-        use_types_for_optimization: false,
-        process_common_js_modules: false,
-        rewrite_polyfills: false,
-        inject_libraries: false,
 
-        // Don't let it create global variables in the browser.
-        // https://github.com/facebook/react/issues/10909
-        assume_function_wrapper: !isUMDBundle,
-        renaming: !shouldStayReadable,
-      }),
+    // 关闭，因为会导致 sourceMap 无法定位到源文件
+    // isProduction &&
+    //   closure({
+    //     compilation_level: 'SIMPLE',
+    //     language_in: 'ECMASCRIPT_2015',
+    //     language_out:
+    //       bundleType === BROWSER_SCRIPT ? 'ECMASCRIPT5' : 'ECMASCRIPT5_STRICT',
+    //     env: 'CUSTOM',
+    //     warning_level: 'QUIET',
+    //     apply_input_source_maps: false,
+    //     use_types_for_optimization: false,
+    //     process_common_js_modules: false,
+    //     rewrite_polyfills: false,
+    //     inject_libraries: false,
+    //
+    //     // Don't let it create global variables in the browser.
+    //     // https://github.com/facebook/react/issues/10909
+    //     assume_function_wrapper: !isUMDBundle,
+    //     renaming: !shouldStayReadable,
+    //   }),
     // HACK to work around the fact that Rollup isn't removing unused, pure-module imports.
     // Note that this plugin must be called after closure applies DCE.
-    isProduction && stripUnusedImports(pureExternalModules),
+    // isProduction && stripUnusedImports(pureExternalModules),
     // Add the whitespace back if necessary.
-    shouldStayReadable &&
-      prettier({
-        parser: 'flow',
-        singleQuote: false,
-        trailingComma: 'none',
-        bracketSpacing: true,
-      }),
+
+    // 取消 prettier 因为会导致打包后的代码无法生成 sourcemap
+    // shouldStayReadable &&
+    //   prettier({
+    //     parser: 'flow',
+    //     singleQuote: false,
+    //     trailingComma: 'none',
+    //     bracketSpacing: true,
+    //   }),
     // License and haste headers, top-level `if` blocks.
-    {
-      renderChunk(source) {
-        return Wrappers.wrapBundle(
-          source,
-          bundleType,
-          globalName,
-          filename,
-          moduleType,
-          bundle.wrapWithModuleBoundaries
-        );
-      },
-    },
+    // {
+    //   renderChunk(source) {
+    //     return Wrappers.wrapBundle(
+    //       source,
+    //       bundleType,
+    //       globalName,
+    //       filename,
+    //       moduleType,
+    //       bundle.wrapWithModuleBoundaries
+    //     );
+    //   },
+    // },
     // Record bundle size.
-    sizes({
-      getSize: (size, gzip) => {
-        const currentSizes = Stats.currentBuildResults.bundleSizes;
-        const recordIndex = currentSizes.findIndex(
-          record =>
-            record.filename === filename && record.bundleType === bundleType
-        );
-        const index = recordIndex !== -1 ? recordIndex : currentSizes.length;
-        currentSizes[index] = {
-          filename,
-          bundleType,
-          packageName,
-          size,
-          gzip,
-        };
-      },
-    }),
+    // sizes({
+    //   getSize: (size, gzip) => {
+    //     const currentSizes = Stats.currentBuildResults.bundleSizes;
+    //     const recordIndex = currentSizes.findIndex(
+    //       record =>
+    //         record.filename === filename && record.bundleType === bundleType
+    //     );
+    //     const index = recordIndex !== -1 ? recordIndex : currentSizes.length;
+    //     currentSizes[index] = {
+    //       filename,
+    //       bundleType,
+    //       packageName,
+    //       size,
+    //       gzip,
+    //     };
+    //   },
+    // }),
   ].filter(Boolean);
 }
 
